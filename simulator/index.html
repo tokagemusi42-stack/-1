@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>金融シミュレーター | NISA・ローン・複利・FX計算ツール</title>
+  <meta name="description" content="積立NISA・住宅ローン・複利計算・FX証拠金を無料でシミュレーション。グラフで将来の資産推移を可視化。">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --primary: #1a56db;
+      --primary-dark: #1341b5;
+      --accent: #f59e0b;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --text: #1e293b;
+      --sub: #64748b;
+      --border: #e2e8f0;
+      --green: #10b981;
+      --red: #ef4444;
+      --radius: 12px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* Header */
+    header {
+      background: var(--primary);
+      color: white;
+      padding: 16px 20px;
+      text-align: center;
+    }
+    header h1 { font-size: 1.4rem; font-weight: 700; }
+    header p { font-size: 0.8rem; opacity: 0.85; margin-top: 4px; }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      overflow-x: auto;
+      background: white;
+      border-bottom: 2px solid var(--border);
+      padding: 0 16px;
+      gap: 4px;
+    }
+    .tab-btn {
+      flex-shrink: 0;
+      padding: 12px 16px;
+      border: none;
+      background: none;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--sub);
+      border-bottom: 3px solid transparent;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .tab-btn.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+    }
+    .tab-btn:hover:not(.active) { color: var(--text); }
+
+    /* Content */
+    .tab-content { display: none; padding: 20px 16px; max-width: 800px; margin: 0 auto; }
+    .tab-content.active { display: block; }
+
+    /* Card */
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.05);
+    }
+    .card h2 { font-size: 1rem; font-weight: 700; margin-bottom: 16px; color: var(--text); }
+
+    /* Form */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    @media (max-width: 480px) { .form-grid { grid-template-columns: 1fr; } }
+
+    .field label {
+      display: block;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--sub);
+      margin-bottom: 6px;
+    }
+    .field input, .field select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.95rem;
+      color: var(--text);
+      background: white;
+      transition: border-color 0.2s;
+    }
+    .field input:focus, .field select:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(26,86,219,0.12);
+    }
+
+    .btn-calc {
+      width: 100%;
+      margin-top: 18px;
+      padding: 13px;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-calc:hover { background: var(--primary-dark); }
+
+    /* Result */
+    .result-card {
+      background: linear-gradient(135deg, #eff6ff, #dbeafe);
+      border: 1px solid #93c5fd;
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-top: 16px;
+    }
+    .result-card h3 { font-size: 0.85rem; color: var(--sub); margin-bottom: 8px; }
+    .result-main {
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--primary);
+      line-height: 1.2;
+    }
+    .result-main span { font-size: 1rem; font-weight: 600; }
+    .result-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .result-item {
+      background: white;
+      border-radius: 8px;
+      padding: 12px;
+    }
+    .result-item .label { font-size: 0.75rem; color: var(--sub); margin-bottom: 4px; }
+    .result-item .value { font-size: 1.1rem; font-weight: 700; color: var(--text); }
+    .value.green { color: var(--green); }
+    .value.red { color: var(--red); }
+
+    /* Chart */
+    .chart-wrap {
+      position: relative;
+      height: 240px;
+      margin-top: 16px;
+    }
+
+    /* Affiliate Banner */
+    .affiliate {
+      background: linear-gradient(135deg, #fef3c7, #fde68a);
+      border: 1px solid #f59e0b;
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-top: 16px;
+      text-align: center;
+    }
+    .affiliate .tag {
+      display: inline-block;
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: #92400e;
+      background: #fde68a;
+      border: 1px solid #d97706;
+      border-radius: 4px;
+      padding: 2px 6px;
+      margin-bottom: 8px;
+      letter-spacing: 0.05em;
+    }
+    .affiliate h3 { font-size: 0.95rem; font-weight: 700; color: #78350f; margin-bottom: 6px; }
+    .affiliate p { font-size: 0.8rem; color: #92400e; margin-bottom: 12px; }
+    .affiliate-btns { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+    .affiliate-btn {
+      display: inline-block;
+      padding: 9px 18px;
+      background: var(--primary);
+      color: white;
+      text-decoration: none;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      transition: background 0.2s;
+    }
+    .affiliate-btn:hover { background: var(--primary-dark); }
+    .affiliate-btn.outline {
+      background: white;
+      color: var(--primary);
+      border: 2px solid var(--primary);
+    }
+    .affiliate-btn.outline:hover { background: #eff6ff; }
+
+    /* Tips */
+    .tips {
+      background: #f0fdf4;
+      border-left: 4px solid var(--green);
+      border-radius: 0 8px 8px 0;
+      padding: 12px 14px;
+      margin-top: 12px;
+      font-size: 0.82rem;
+      color: #065f46;
+      line-height: 1.6;
+    }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      padding: 24px 16px;
+      color: var(--sub);
+      font-size: 0.75rem;
+      line-height: 1.8;
+      border-top: 1px solid var(--border);
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>金融シミュレーター</h1>
+  <p>NISA・住宅ローン・複利・FX証拠金を無料計算</p>
+</header>
+
+<nav class="tabs">
+  <button class="tab-btn active" onclick="switchTab('nisa', this)">📈 積立NISA</button>
+  <button class="tab-btn" onclick="switchTab('loan', this)">🏠 住宅ローン</button>
+  <button class="tab-btn" onclick="switchTab('compound', this)">💰 複利計算</button>
+  <button class="tab-btn" onclick="switchTab('fx', this)">💱 FX証拠金</button>
+</nav>
+
+<!-- ========== 積立NISA ========== -->
+<div id="tab-nisa" class="tab-content active">
+  <div class="card">
+    <h2>📈 積立NISAシミュレーター</h2>
+    <div class="form-grid">
+      <div class="field">
+        <label>毎月の積立額（円）</label>
+        <input type="number" id="nisa-monthly" value="33333" min="1000" step="1000">
+      </div>
+      <div class="field">
+        <label>想定年利率（%）</label>
+        <input type="number" id="nisa-rate" value="5" min="0.1" max="20" step="0.1">
+      </div>
+      <div class="field">
+        <label>積立期間（年）</label>
+        <input type="number" id="nisa-years" value="20" min="1" max="40">
+      </div>
+      <div class="field">
+        <label>現在の保有額（円）</label>
+        <input type="number" id="nisa-initial" value="0" min="0" step="10000">
+      </div>
+    </div>
+    <button class="btn-calc" onclick="calcNisa()">計算する</button>
+  </div>
+
+  <div id="nisa-result" style="display:none;">
+    <div class="result-card">
+      <h3>積立終了時の資産総額</h3>
+      <div class="result-main" id="nisa-total"></div>
+      <div class="result-grid">
+        <div class="result-item">
+          <div class="label">元本合計</div>
+          <div class="value" id="nisa-principal"></div>
+        </div>
+        <div class="result-item">
+          <div class="label">運用益（利益）</div>
+          <div class="value green" id="nisa-profit"></div>
+        </div>
+        <div class="result-item">
+          <div class="label">総積立額</div>
+          <div class="value" id="nisa-monthly-sum"></div>
+        </div>
+        <div class="result-item">
+          <div class="label">資産倍率</div>
+          <div class="value green" id="nisa-multiple"></div>
+        </div>
+      </div>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="nisa-chart"></canvas>
+    </div>
+    <div class="tips">
+      💡 <strong>NISAのポイント:</strong> 2024年から新NISAが始まり、年間360万円まで非課税で投資可能。運用益・配当金にかかる20.315%の税金が0円になります。長期・積立・分散投資がリターン最大化の鍵です。
+    </div>
+  </div>
+
+  <div class="affiliate">
+    <div class="tag">PR・広告</div>
+    <h3>🎯 今すぐNISA口座を開設しよう</h3>
+    <p>手数料無料・最短即日開設。まずは口座開設だけでもOK。</p>
+    <div class="affiliate-btns">
+      <a href="#" class="affiliate-btn" onclick="return false;">SBI証券で開設（無料）</a>
+      <a href="#" class="affiliate-btn outline" onclick="return false;">楽天証券で開設（無料）</a>
+    </div>
+  </div>
+</div>
+
+<!-- ========== 住宅ローン ========== -->
+<div id="tab-loan" class="tab-content">
+  <div class="card">
+    <h2>🏠 住宅ローンシミュレーター</h2>
+    <div class="form-grid">
+      <div class="field">
+        <label>借入金額（万円）</label>
+        <input type="number" id="loan-amount" value="4000" min="100" step="100">
+      </div>
+      <div class="field">
+        <label>年利率（%）</label>
+        <input type="number" id="loan-rate" value="1.5" min="0.1" max="10" step="0.01">
+      </div>
+      <div class="field">
+        <label>返済期間（年）</label>
+        <input type="number" id="loan-years" value="35" min="1" max="50">
+      </div>
+      <div class="field">
+        <label>返済方式</label>
+        <select id="loan-type">
+          <option value="equal">元利均等返済</option>
+          <option value="principal">元金均等返済</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn-calc" onclick="calcLoan()">計算する</button>
+  </div>
+
+  <div id="loan-result" style="display:none;">
+    <div class="result-card">
+      <h3>毎月の返済額</h3>
+      <div class="result-main" id="loan-monthly"></div>
+      <div class="result-grid">
+        <div class="result-item">
+          <div class="label">借入金額</div>
+          <div class="value" id="loan-principal"></div>
+        </div>
+        <div class="result-item">
+          <div class="label">総支払利息</div>
+          <div class="value red" id="loan-interest"></div>
+        </div>
+        <div class="result-item">
+          <div class="label">総返済額</div>
+          <div class="value" id="loan-total"></div>
+        </div>
+        <div class="result-item">
+          <div class="label">利息負担率</div>
+          <div class="value red" id="loan-ratio"></div>
+        </div>
+      </div>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="loan-chart"></canvas>
+    </div>
+    <div class="tips">
+      💡 <strong>ローンのポイント:</strong> 金利0.1%の差で数十万円変わります。繰り上げ返済は元金均等返済と組み合わせると効果的。固定金利 vs 変動金利は金利上昇リスクと相談して選択しましょう。
+    </div>
+  </div>
+
+  <div class="affiliate">
+    <div class="tag">PR・広告</div>
+    <h3>🏦 住宅ローンの金利を比較しよう</h3>
+    <p>最低金利0.3%台も。無料で複数社を一括比較できます。</p>
+    <div class="affiliate-btns">
+      <a href="#" class="affiliate-btn" onclick="return false;">住宅ローン一括比較（無料）</a>
+      <a href="#" class="affiliate-btn outline" onclick="return false;">金利シミュレーション</a>
+    </div>
+  </div>
+</div>
+
+<!-- ========== 複利計算 ========== -->
+<div id="tab-compound" class="tab-content">
+  <div class="card">
+    <h2>💰 複利計算ツール</h2>
+    <div class="form-grid">
+      <div class="field">
+        <label>初期投資額（円）</label>
+        <input type="number" id="cp-initial" value="1000000" min="0" step="10000">
+      </div>
+      <div class="field">
+        <label>年間追加投資額（円）</label>
+        <input type="number" id="cp-yearly" value="600000" min="0" step="10000">
+      </div>
+      <div class="field">
+        <label>年利率（%）</label>
+        <input type="number" id="cp-rate" value="7" min="0.1" max="30" step="0.1">
+      </div>
+      <div class="field">
+        <label>運用期間（年）</label>
+        <input type="number" id="cp-years" value="30" min="1" max="50">
+      </div>
+    </div>
+    <button class="btn-calc" onclick="calcCompound()">計算する</button>
+  </div>
+
+  <div id="compound-result" style="display:none;">
+    <div class="result-card">
+      <h3>運用終了時の資産</h3>
+      <div class="result-main" id="cp-total"></div>
+      <div class="result-grid">
+        <div class="result-item">
+          <div class="label">総投資額</div>
+          <div class="value" id="cp-invested"></div>
+        </div>
+        <div class="result-item">
+          <div class="label">複利による利益</div>
+          <div class="value green" id="cp-profit"></div>
+        </div>
+        <div class="result-item">
+          <div class="label">資産倍率</div>
+          <div class="value green" id="cp-multiple"></div>
+        </div>
+        <div class="result-item">
+          <div class="label">72の法則（倍増年数）</div>
+          <div class="value" id="cp-rule72"></div>
+        </div>
+      </div>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="compound-chart"></canvas>
+    </div>
+    <div class="tips">
+      💡 <strong>複利の力:</strong> アインシュタインが「世界第8の不思議」と呼んだ複利。72÷年利率＝資産が2倍になる年数（72の法則）。年利7%なら約10年で2倍、20年で4倍になります。
+    </div>
+  </div>
+
+  <div class="affiliate">
+    <div class="tag">PR・広告</div>
+    <h3>📊 長期投資で複利を最大化しよう</h3>
+    <p>インデックス投資・ETFで世界経済の成長を取り込もう。</p>
+    <div class="affiliate-btns">
+      <a href="#" class="affiliate-btn" onclick="return false;">投資口座を開設（無料）</a>
+      <a href="#" class="affiliate-btn outline" onclick="return false;">おすすめETFを見る</a>
+    </div>
+  </div>
+</div>
+
+<!-- ========== FX ========== -->
+<div id="tab-fx" class="tab-content">
+  <div class="card">
+    <h2>💱 FX証拠金計算ツール</h2>
+    <div class="form-grid">
+      <div class="field">
+        <label>通貨ペア</label>
+        <select id="fx-pair">
+          <option value="usdjpy">USD/JPY（ドル円）</option>
+          <option value="eurjpy">EUR/JPY（ユーロ円）</option>
+          <option value="gbpjpy">GBP/JPY（ポンド円）</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>現在レート（円）</label>
+        <input type="number" id="fx-rate" value="150" min="1" step="0.1">
+      </div>
+      <div class="field">
+        <label>取引数量（ロット）</label>
+        <input type="number" id="fx-lot" value="1" min="0.1" max="100" step="0.1">
+      </div>
+      <div class="field">
+        <label>レバレッジ（倍）</label>
+        <select id="fx-leverage">
+          <option value="1">1倍</option>
+          <option value="5">5倍</option>
+          <option value="10" selected>10倍</option>
+          <option value="25">25倍</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>スプレッド（pips）</label>
+        <input type="number" id="fx-spread" value="0.3" min="0" step="0.1">
+      </div>
+      <div class="field">
+        <label>スワップポイント（円/日）</label>
+        <input type="number" id="fx-swap" value="50" step="1">
+      </div>
+    </div>
+    <button class="btn-calc" onclick="calcFx()">計算する</button>
+  </div>
+
+  <div id="fx-result" style="display:none;">
+    <div class="result-card">
+      <h3>必要証拠金</h3>
+      <div class="result-main" id="fx-margin"></div>
+      <div class="result-grid">
+        <div class="result-item">
+          <div class="label">取引金額（1ロット）</div>
+          <div class="value" id="fx-trade-amount"></div>
+        </div>
+        <div class="result-item">
+          <div class="label">スプレッドコスト</div>
+          <div class="value red" id="fx-spread-cost"></div>
+        </div>
+        <div class="result-item">
+          <div class="label">1pip あたりの損益</div>
+          <div class="value" id="fx-pip-value"></div>
+        </div>
+        <div class="result-item">
+          <div class="label">月間スワップ収入</div>
+          <div class="value green" id="fx-swap-monthly"></div>
+        </div>
+      </div>
+    </div>
+    <div class="tips">
+      💡 <strong>FXの注意点:</strong> レバレッジを上げると利益も損失も拡大します。国内FXの最大レバレッジは25倍。証拠金維持率が一定以下になるとロスカットされます。必ず余裕資金で取引しましょう。
+    </div>
+  </div>
+
+  <div class="affiliate">
+    <div class="tag">PR・広告</div>
+    <h3>💱 FX口座を開設して取引を始めよう</h3>
+    <p>口座開設ボーナス最大〇万円。スプレッド業界最狭水準。</p>
+    <div class="affiliate-btns">
+      <a href="#" class="affiliate-btn" onclick="return false;">GMOクリック証券で開設</a>
+      <a href="#" class="affiliate-btn outline" onclick="return false;">SBI FXトレードで開設</a>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <p>本シミュレーターの計算結果は概算値であり、投資・ローンの成果を保証するものではありません。</p>
+  <p>実際の運用結果は市場状況により大きく異なる場合があります。</p>
+  <p style="margin-top:8px;">当サイトはアフィリエイトプログラムを利用しています（PR）</p>
+</footer>
+
+<script>
+// ─── ユーティリティ ───
+let nisaChart, loanChart, compoundChart;
+
+function fmt(n) {
+  if (n >= 1e8) return (n / 1e8).toFixed(2) + '億円';
+  if (n >= 1e4) return Math.round(n / 1e4).toLocaleString() + '万円';
+  return Math.round(n).toLocaleString() + '円';
+}
+function fmtExact(n) { return Math.round(n).toLocaleString() + '円'; }
+
+// ─── タブ切り替え ───
+function switchTab(id, btn) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ─── 積立NISA ───
+function calcNisa() {
+  const monthly = parseFloat(document.getElementById('nisa-monthly').value) || 0;
+  const rate = parseFloat(document.getElementById('nisa-rate').value) / 100 / 12;
+  const months = (parseFloat(document.getElementById('nisa-years').value) || 0) * 12;
+  const initial = parseFloat(document.getElementById('nisa-initial').value) || 0;
+
+  const labels = [], dataTotal = [], dataPrincipal = [];
+  let total = initial;
+  let principalCum = initial;
+
+  for (let m = 1; m <= months; m++) {
+    total = total * (1 + rate) + monthly;
+    principalCum = initial + monthly * m;
+    if (m % 12 === 0) {
+      labels.push(m / 12 + '年');
+      dataTotal.push(Math.round(total));
+      dataPrincipal.push(Math.round(principalCum));
+    }
+  }
+
+  const profit = total - principalCum;
+  document.getElementById('nisa-total').innerHTML = fmt(total) + ' <span>（税引前）</span>';
+  document.getElementById('nisa-principal').textContent = fmt(principalCum);
+  document.getElementById('nisa-profit').textContent = '+' + fmt(profit);
+  document.getElementById('nisa-monthly-sum').textContent = fmt(monthly * months);
+  document.getElementById('nisa-multiple').textContent = (total / Math.max(principalCum, 1)).toFixed(2) + '倍';
+  document.getElementById('nisa-result').style.display = 'block';
+
+  if (nisaChart) nisaChart.destroy();
+  nisaChart = new Chart(document.getElementById('nisa-chart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: '元本', data: dataPrincipal, backgroundColor: '#93c5fd' },
+        { label: '運用益', data: dataTotal.map((v, i) => v - dataPrincipal[i]), backgroundColor: '#10b981' }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top' } },
+      scales: {
+        x: { stacked: true },
+        y: { stacked: true, ticks: { callback: v => (v / 1e4).toFixed(0) + '万' } }
+      }
+    }
+  });
+}
+
+// ─── 住宅ローン ───
+function calcLoan() {
+  const amount = (parseFloat(document.getElementById('loan-amount').value) || 0) * 10000;
+  const r = parseFloat(document.getElementById('loan-rate').value) / 100 / 12;
+  const n = (parseFloat(document.getElementById('loan-years').value) || 0) * 12;
+  const type = document.getElementById('loan-type').value;
+
+  let monthly, totalPay;
+  if (type === 'equal') {
+    monthly = amount * r * Math.pow(1 + r, n) / (Math.pow(1 + r, n) - 1);
+    totalPay = monthly * n;
+  } else {
+    monthly = amount / n + amount * r; // 初月（元金均等は変動）
+    totalPay = amount + amount * r * (n + 1) / 2;
+  }
+  const totalInterest = totalPay - amount;
+
+  document.getElementById('loan-monthly').innerHTML = fmtExact(monthly) + ' <span>/月</span>';
+  document.getElementById('loan-principal').textContent = fmt(amount);
+  document.getElementById('loan-interest').textContent = fmt(totalInterest);
+  document.getElementById('loan-total').textContent = fmt(totalPay);
+  document.getElementById('loan-ratio').textContent = ((totalInterest / totalPay) * 100).toFixed(1) + '%';
+  document.getElementById('loan-result').style.display = 'block';
+
+  // 残高推移
+  const labels = [], dataBalance = [], dataCumInterest = [];
+  let balance = amount, cumInterest = 0;
+  for (let m = 1; m <= n; m++) {
+    const interestPart = balance * r;
+    cumInterest += interestPart;
+    balance -= (type === 'equal' ? monthly - interestPart : amount / n);
+    if (m % 12 === 0) {
+      labels.push(m / 12 + '年');
+      dataBalance.push(Math.max(0, Math.round(balance)));
+      dataCumInterest.push(Math.round(cumInterest));
+    }
+  }
+
+  if (loanChart) loanChart.destroy();
+  loanChart = new Chart(document.getElementById('loan-chart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'ローン残高', data: dataBalance, borderColor: '#1a56db', backgroundColor: 'rgba(26,86,219,.1)', fill: true, tension: 0.3 },
+        { label: '累計利息', data: dataCumInterest, borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,.1)', fill: true, tension: 0.3 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top' } },
+      scales: { y: { ticks: { callback: v => (v / 1e4).toFixed(0) + '万' } } }
+    }
+  });
+}
+
+// ─── 複利計算 ───
+function calcCompound() {
+  const initial = parseFloat(document.getElementById('cp-initial').value) || 0;
+  const yearly = parseFloat(document.getElementById('cp-yearly').value) || 0;
+  const rate = parseFloat(document.getElementById('cp-rate').value) / 100;
+  const years = parseFloat(document.getElementById('cp-years').value) || 0;
+
+  const labels = [], dataTotal = [], dataPrincipal = [];
+  let total = initial;
+  for (let y = 1; y <= years; y++) {
+    total = (total + yearly) * (1 + rate);
+    const principal = initial + yearly * y;
+    labels.push(y + '年');
+    dataTotal.push(Math.round(total));
+    dataPrincipal.push(principal);
+  }
+  const totalInvested = initial + yearly * years;
+  const profit = total - totalInvested;
+  const rule72 = (72 / (parseFloat(document.getElementById('cp-rate').value))).toFixed(1);
+
+  document.getElementById('cp-total').innerHTML = fmt(total);
+  document.getElementById('cp-invested').textContent = fmt(totalInvested);
+  document.getElementById('cp-profit').textContent = '+' + fmt(profit);
+  document.getElementById('cp-multiple').textContent = (total / Math.max(totalInvested, 1)).toFixed(2) + '倍';
+  document.getElementById('cp-rule72').textContent = rule72 + '年';
+  document.getElementById('compound-result').style.display = 'block';
+
+  if (compoundChart) compoundChart.destroy();
+  compoundChart = new Chart(document.getElementById('compound-chart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: '総資産', data: dataTotal, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,.15)', fill: true, tension: 0.3 },
+        { label: '投資元本', data: dataPrincipal, borderColor: '#94a3b8', borderDash: [6, 3], fill: false, tension: 0 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top' } },
+      scales: { y: { ticks: { callback: v => (v / 1e4).toFixed(0) + '万' } } }
+    }
+  });
+}
+
+// ─── FX ───
+function calcFx() {
+  const rate = parseFloat(document.getElementById('fx-rate').value) || 150;
+  const lot = parseFloat(document.getElementById('fx-lot').value) || 1;
+  const leverage = parseFloat(document.getElementById('fx-leverage').value) || 10;
+  const spread = parseFloat(document.getElementById('fx-spread').value) || 0;
+  const swap = parseFloat(document.getElementById('fx-swap').value) || 0;
+
+  const unitSize = 10000; // 1ロット = 1万通貨
+  const tradeAmount = lot * unitSize * rate;
+  const margin = tradeAmount / leverage;
+  const spreadCost = spread * lot * unitSize * 0.01; // pips → 円
+  const pipValue = lot * unitSize * 0.01;
+
+  document.getElementById('fx-margin').innerHTML = fmtExact(margin);
+  document.getElementById('fx-trade-amount').textContent = fmt(tradeAmount);
+  document.getElementById('fx-spread-cost').textContent = fmtExact(spreadCost);
+  document.getElementById('fx-pip-value').textContent = fmtExact(pipValue) + '/pip';
+  document.getElementById('fx-swap-monthly').textContent = fmtExact(swap * 30) + '/月';
+  document.getElementById('fx-result').style.display = 'block';
+}
+
+// 初期計算実行
+calcNisa();
+</script>
+</body>
+</html>
